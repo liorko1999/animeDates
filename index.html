@@ -17,9 +17,7 @@
   <div id="list"></div>
 
   <script>
-    // Get saved items from localStorage
     let items = JSON.parse(localStorage.getItem("myPicks") || "[]");
-
     const listDiv = document.getElementById("list");
 
     function renderList() {
@@ -28,9 +26,10 @@
         const itemDiv = document.createElement("div");
         itemDiv.className = "item";
 
+        const release = new Date(item.releaseDate);
         itemDiv.innerHTML = `
           <h2>${item.title} ${item.type === "anime" ? "(Anime)" : "(Movie)"}</h2>
-          <p>Release Date: ${new Date(item.releaseDate).toDateString()}</p>
+          <p>Release Date: ${release.toDateString()}</p>
           <p class="timer" id="timer-${index}"></p>
         `;
         listDiv.appendChild(itemDiv);
