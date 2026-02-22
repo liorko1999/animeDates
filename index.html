@@ -6,35 +6,108 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h1 { text-align: center; }
-    .item { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 8px; }
-    .timer { font-weight: bold; color: #333; }
-    a { text-decoration: none; color: blue; }
+    a { text-decoration: none; color: blue; display: inline-block; margin-bottom: 20px; }
+    
+    #list { display: flex; flex-direction: column; gap: 15px; }
+
+    .item {
+      display: flex;
+      align-items: center;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 8px;
+      gap: 15px;
+    }
+
+    .item img {
+      width: 100px;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+
+    .details { flex: 1; }
+
+    .timer { font-weight: bold; color: #333; margin-top: 5px; }
+
+    .delete-btn {
+      background-color: red;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      height: 30px;
+    }
+
+    .delete-btn:hover { background-color: darkred; }
   </style>
 </head>
 <body>
   <h1>My Anime & Movie Countdown</h1>
   <a href="add.html">➕ Add Anime or Movie</a>
+
   <div id="list"></div>
 
   <script>
+    const TMDB_KEY = "2c99c7f6a5ee358bbb0dce7c47b8e374";
+
     let items = JSON.parse(localStorage.getItem("myPicks") || "[]");
     const listDiv = document.getElementById("list");
 
-    function renderList() {
+    async function renderList() {
       listDiv.innerHTML = "";
-      items.forEach((item, index) => {
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
         const itemDiv = document.createElement("div");
         itemDiv.className = "item";
 
+        // Get poster image
+        let imgSrc = "";
+        if (item.type === "anime") {
+          try {
+            const res = await fetch("https://graphql.anilist.co", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                query: `
+                  query ($search: String) {
+                    Media(search: $search, type: ANIME) {
+                      coverImage { medium }
+                    }
+                  }`,
+                variables: { search: item.title }
+              })
+            });
+            const data = await res.json();
+            imgSrc = data.data.Media.coverImage.medium;
+          } catch(e) { imgSrc = ""; }
+        } else {
+          // Movie poster from TMDb
+          try {
+            const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(item.title)}`);
+            const data = await res.json();
+            if (data.results && data.results[0] && data.results[0].poster_path) {
+              imgSrc = "https://image.tmdb.org/t/p/w200" + data.results[0].poster_path;
+            }
+          } catch(e) { imgSrc = ""; }
+        }
+
         const release = new Date(item.releaseDate);
         itemDiv.innerHTML = `
-          <h2>${item.title} ${item.type === "anime" ? "(Anime)" : "(Movie)"}</h2>
-          <p>Release Date: ${release.toDateString()}</p>
-          <p class="timer" id="timer-${index}"></p>
+          <img src="${imgSrc}" alt="Poster">
+          <div class="details">
+            <h2>${item.title} (${item.type === "anime" ? "Anime" : "Movie"})</h2>
+            <p>Release Date: ${release.toDateString()}</p>
+            <p class="timer" id="timer-${i}"></p>
+          </div>
+          <button class="delete-btn" onclick="deleteItem(${i})">Delete</button>
         `;
+
         listDiv.appendChild(itemDiv);
-        startCountdown(item.releaseDate, `timer-${index}`);
-      });
+        startCountdown(item.releaseDate, `timer-${i}`);
+      }
     }
 
     function startCountdown(dateStr, elementId) {
@@ -45,6 +118,7 @@
         const diff = releaseDate - now;
         const el = document.getElementById(elementId);
 
+        if (!el) return; // in case deleted
         if (diff > 0) {
           const days = Math.floor(diff / (1000*60*60*24));
           const hours = Math.floor((diff / (1000*60*60)) % 24);
@@ -58,6 +132,12 @@
 
       update();
       setInterval(update, 1000);
+    }
+
+    function deleteItem(index) {
+      items.splice(index, 1);
+      localStorage.setItem("myPicks", JSON.stringify(items));
+      renderList();
     }
 
     renderList();
