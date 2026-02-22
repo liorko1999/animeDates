@@ -25,7 +25,7 @@
   <input type="text" id="title" placeholder="Enter anime/movie name">
 
   <div id="movieDateInput" style="display:none;">
-    <label>Release Date (for movies)</label>
+    <label>Release Date (fallback for movies)</label>
     <input type="date" id="releaseDate">
   </div>
 
@@ -34,6 +34,7 @@
   <script>
     const typeSelect = document.getElementById("type");
     const movieDateInput = document.getElementById("movieDateInput");
+    const TMDB_KEY = "2c99c7f6a5ee358bbb0dce7c47b8e374";
 
     typeSelect.addEventListener("change", () => {
       movieDateInput.style.display = typeSelect.value === "movie" ? "block" : "none";
@@ -47,7 +48,7 @@
       let releaseDate;
 
       if (type === "anime") {
-        // Fetch release date from AniList API
+        // AniList API
         const query = `
         query ($search: String) {
           Media(search: $search, type: ANIME) {
@@ -60,15 +61,24 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query, variables: { search: title } })
         });
+
         const data = await res.json();
         const d = data.data.Media.startDate;
         if (!d.year) return alert("Anime not found");
         releaseDate = new Date(d.year, d.month - 1, d.day).toISOString();
+
       } else {
-        // Movie: use manually entered date
-        const dateInput = document.getElementById("releaseDate").value;
-        if (!dateInput) return alert("Enter a release date");
-        releaseDate = new Date(dateInput).toISOString();
+        // TMDb API
+        const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(title)}`);
+        const data = await res.json();
+        if (!data.results || data.results.length === 0) {
+          // fallback to manual input
+          const dateInput = document.getElementById("releaseDate").value;
+          if (!dateInput) return alert("Movie not found and no date entered");
+          releaseDate = new Date(dateInput).toISOString();
+        } else {
+          releaseDate = new Date(data.results[0].release_date).toISOString();
+        }
       }
 
       const items = JSON.parse(localStorage.getItem("myPicks") || "[]");
@@ -76,7 +86,7 @@
       localStorage.setItem("myPicks", JSON.stringify(items));
 
       alert("Added successfully!");
-      window.location.href = "index.html"; // Go back to list
+      window.location.href = "index.html";
     }
   </script>
 </body>
