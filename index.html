@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <title>My Anime & Movie Countdown</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- ✅ essential for mobile -->
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h1 { text-align: center; }
-    a { text-decoration: none; color: blue; display: inline-block; margin-bottom: 20px; }
-    
+    body { font-family: Arial, sans-serif; margin: 20px; font-size: 16px; }
+    h1 { text-align: center; font-size: 1.8em; }
+    a { text-decoration: none; color: blue; display: inline-block; margin-bottom: 20px; font-size: 1em; }
+
     #list { display: flex; flex-direction: column; gap: 15px; }
 
     .item {
@@ -17,6 +18,7 @@
       padding: 10px;
       border-radius: 8px;
       gap: 15px;
+      flex-wrap: wrap; /* ✅ wrap on small screens */
     }
 
     .item img {
@@ -24,23 +26,37 @@
       height: 150px;
       object-fit: cover;
       border-radius: 4px;
+      flex-shrink: 0;
     }
 
-    .details { flex: 1; }
+    .details { flex: 1; min-width: 150px; } /* ✅ ensure text wraps nicely */
+    .details h2 { font-size: 1.2em; margin: 0; }
+    .details p { margin: 5px 0; font-size: 1em; }
 
-    .timer { font-weight: bold; color: #333; margin-top: 5px; }
+    .timer { font-weight: bold; color: #333; }
 
     .delete-btn {
       background-color: red;
       color: white;
       border: none;
-      padding: 5px 10px;
+      padding: 7px 12px;
       border-radius: 5px;
       cursor: pointer;
-      height: 30px;
+      font-size: 0.9em;
+      height: auto;
     }
 
     .delete-btn:hover { background-color: darkred; }
+
+    /* Responsive adjustments */
+    @media (max-width: 480px) {
+      body { margin: 10px; font-size: 14px; }
+      .item { flex-direction: column; align-items: flex-start; }
+      .item img { width: 80px; height: 120px; }
+      .details h2 { font-size: 1.1em; }
+      .details p { font-size: 0.95em; }
+      .delete-btn { width: 100%; text-align: center; margin-top: 5px; }
+    }
   </style>
 </head>
 <body>
@@ -118,7 +134,7 @@
         const diff = releaseDate - now;
         const el = document.getElementById(elementId);
 
-        if (!el) return; // in case deleted
+        if (!el) return;
         if (diff > 0) {
           const days = Math.floor(diff / (1000*60*60*24));
           const hours = Math.floor((diff / (1000*60*60)) % 24);
