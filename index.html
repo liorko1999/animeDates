@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <title>My Anime & Movie Countdown</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- ✅ essential for mobile -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; font-size: 16px; }
     h1 { text-align: center; font-size: 1.8em; }
-    a { text-decoration: none; color: blue; display: inline-block; margin-bottom: 20px; font-size: 1em; }
+    a { text-decoration: none; color: blue; display: inline-block; margin-bottom: 20px; }
 
     #list { display: flex; flex-direction: column; gap: 15px; }
 
@@ -18,7 +18,7 @@
       padding: 10px;
       border-radius: 8px;
       gap: 15px;
-      flex-wrap: wrap; /* ✅ wrap on small screens */
+      flex-wrap: wrap;
     }
 
     .item img {
@@ -29,7 +29,7 @@
       flex-shrink: 0;
     }
 
-    .details { flex: 1; min-width: 150px; } /* ✅ ensure text wraps nicely */
+    .details { flex: 1; min-width: 150px; }
     .details h2 { font-size: 1.2em; margin: 0; }
     .details p { margin: 5px 0; font-size: 1em; }
 
@@ -48,7 +48,6 @@
 
     .delete-btn:hover { background-color: darkred; }
 
-    /* Responsive adjustments */
     @media (max-width: 480px) {
       body { margin: 10px; font-size: 14px; }
       .item { flex-direction: column; align-items: flex-start; }
@@ -79,7 +78,7 @@
         const itemDiv = document.createElement("div");
         itemDiv.className = "item";
 
-        // Get poster image
+        // Poster image
         let imgSrc = "";
         if (item.type === "anime") {
           try {
@@ -91,56 +90,75 @@
                   query ($search: String) {
                     Media(search: $search, type: ANIME) {
                       coverImage { medium }
+                      episodes
+                      nextAiringEpisode { episode airingAt }
                     }
                   }`,
                 variables: { search: item.title }
               })
             });
             const data = await res.json();
-            imgSrc = data.data.Media.coverImage.medium;
-          } catch(e) { imgSrc = ""; }
+            const media = data.data.Media;
+            imgSrc = media.coverImage.medium;
+            item.totalEpisodes = media.episodes;
+            item.nextAiringEpisode = media.nextAiringEpisode;
+          } catch(e) {}
         } else {
-          // Movie poster from TMDb
           try {
             const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(item.title)}`);
             const data = await res.json();
             if (data.results && data.results[0] && data.results[0].poster_path) {
               imgSrc = "https://image.tmdb.org/t/p/w200" + data.results[0].poster_path;
             }
-          } catch(e) { imgSrc = ""; }
+          } catch(e) {}
         }
 
         const release = new Date(item.releaseDate);
+
+        let episodeInfo = "";
+        if (item.type === "anime") {
+          episodeInfo = item.totalEpisodes ? `Total Episodes: ${item.totalEpisodes}` : "Episodes: Unknown";
+        }
+
         itemDiv.innerHTML = `
           <img src="${imgSrc}" alt="Poster">
           <div class="details">
             <h2>${item.title} (${item.type === "anime" ? "Anime" : "Movie"})</h2>
             <p>Release Date: ${release.toDateString()}</p>
+            <p>${episodeInfo}</p>
+            ${item.type === "anime" && item.nextAiringEpisode ? `<p class="timer" id="timer-next-${i}"></p>` : ""}
             <p class="timer" id="timer-${i}"></p>
           </div>
           <button class="delete-btn" onclick="deleteItem(${i})">Delete</button>
         `;
 
         listDiv.appendChild(itemDiv);
+
+        // Countdown to series release (if future)
         startCountdown(item.releaseDate, `timer-${i}`);
+
+        // Countdown to next episode (if anime)
+        if (item.type === "anime" && item.nextAiringEpisode) {
+          const nextAiringTime = item.nextAiringEpisode.airingAt * 1000; // convert from Unix timestamp
+          startCountdown(nextAiringTime, `timer-next-${i}`);
+        }
       }
     }
 
-    function startCountdown(dateStr, elementId) {
-      const releaseDate = new Date(dateStr);
+    function startCountdown(dateOrTimestamp, elementId) {
+      const releaseDate = new Date(dateOrTimestamp);
 
       function update() {
         const now = new Date();
         const diff = releaseDate - now;
         const el = document.getElementById(elementId);
-
         if (!el) return;
         if (diff > 0) {
           const days = Math.floor(diff / (1000*60*60*24));
           const hours = Math.floor((diff / (1000*60*60)) % 24);
           const minutes = Math.floor((diff / (1000*60)) % 60);
           const seconds = Math.floor((diff / 1000) % 60);
-          el.innerText = `${days}d ${hours}h ${minutes}m ${seconds}s until release`;
+          el.innerText = `${days}d ${hours}h ${minutes}m ${seconds}s`;
         } else {
           el.innerText = "Already released!";
         }
