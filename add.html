@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Anime or Movie</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    label { display: block; margin: 10px 0 5px; }
+    input, select, button { padding: 5px; margin-bottom: 10px; width: 100%; }
+    a { text-decoration: none; color: blue; display: inline-block; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Add Anime or Movie</h1>
+  <a href="index.html">⬅ Back to List</a>
+
+  <label>Type</label>
+  <select id="type">
+    <option value="anime">Anime</option>
+    <option value="movie">Movie</option>
+  </select>
+
+  <label>Title</label>
+  <input type="text" id="title" placeholder="Enter anime/movie name">
+
+  <div id="movieDateInput" style="display:none;">
+    <label>Release Date (for movies)</label>
+    <input type="date" id="releaseDate">
+  </div>
+
+  <button onclick="addItem()">Add</button>
+
+  <script>
+    const typeSelect = document.getElementById("type");
+    const movieDateInput = document.getElementById("movieDateInput");
+
+    typeSelect.addEventListener("change", () => {
+      movieDateInput.style.display = typeSelect.value === "movie" ? "block" : "none";
+    });
+
+    async function addItem() {
+      const type = typeSelect.value;
+      const title = document.getElementById("title").value.trim();
+      if (!title) return alert("Enter a title");
+
+      let releaseDate;
+
+      if (type === "anime") {
+        // Fetch release date from AniList API
+        const query = `
+        query ($search: String) {
+          Media(search: $search, type: ANIME) {
+            startDate { year month day }
+          }
+        }`;
+
+        const res = await fetch("https://graphql.anilist.co", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, variables: { search: title } })
+        });
+        const data = await res.json();
+        const d = data.data.Media.startDate;
+        if (!d.year) return alert("Anime not found");
+        releaseDate = new Date(d.year, d.month - 1, d.day).toISOString();
+      } else {
+        // Movie: use manually entered date
+        const dateInput = document.getElementById("releaseDate").value;
+        if (!dateInput) return alert("Enter a release date");
+        releaseDate = new Date(dateInput).toISOString();
+      }
+
+      const items = JSON.parse(localStorage.getItem("myPicks") || "[]");
+      items.push({ type, title, releaseDate });
+      localStorage.setItem("myPicks", JSON.stringify(items));
+
+      alert("Added successfully!");
+      window.location.href = "index.html"; // Go back to list
+    }
+  </script>
+</body>
+</html>
