@@ -1,91 +1,146 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Add Anime or Movie</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- ✅ mobile scaling -->
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; font-size: 16px; }
-    h1 { text-align: center; font-size: 1.8em; margin-bottom: 20px; }
-    a { text-decoration: none; color: blue; display: inline-block; margin-bottom: 20px; font-size: 1em; }
+<meta charset="UTF-8">
+<title>Add Anime or Movie</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    label { display: block; margin: 10px 0 5px; font-weight: bold; }
-    input, select, button { padding: 10px; margin-bottom: 15px; width: 100%; font-size: 1em; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
-    button { background-color: #007bff; color: white; border: none; cursor: pointer; }
-    button:hover { background-color: #0056b3; }
-
-    /* Responsive adjustments */
-    @media (max-width: 480px) {
-      body { margin: 10px; font-size: 14px; }
-      input, select, button { font-size: 1em; padding: 8px; }
-    }
-  </style>
+<style>
+body { font-family: Arial; margin: 20px; }
+h1 { text-align: center; }
+select, input, button {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  font-size: 16px;
+  border-radius: 6px;
+}
+button {
+  background: #007bff;
+  color: white;
+  border: none;
+}
+</style>
 </head>
+
 <body>
-  <h1>Add Anime or Movie</h1>
-  <a href="index.html">⬅ Back to List</a>
 
-  <label>Type</label>
-  <select id="type">
-    <option value="anime">Anime</option>
-    <option value="movie">Movie</option>
-  </select>
+<h1>Add Anime or Movie</h1>
+<a href="index.html">⬅ Back</a>
 
-  <label>Title</label>
-  <input type="text" id="title" placeholder="Enter anime or movie name">
+<select id="type">
+  <option value="anime">Anime</option>
+  <option value="movie">Movie</option>
+</select>
 
-  <button onclick="addItem()">Add</button>
+<input type="text" id="searchInput" placeholder="Start typing...">
 
-  <script>
-    const typeSelect = document.getElementById("type");
-    const TMDB_KEY = "2c99c7f6a5ee358bbb0dce7c47b8e374";
+<select id="results" size="5" style="display:none;"></select>
 
-    async function addItem() {
-      const type = typeSelect.value;
-      const title = document.getElementById("title").value.trim();
-      if (!title) return alert("Enter a title");
+<button onclick="addSelected()">Add Selected</button>
 
-      let releaseDate;
+<script>
+const TMDB_KEY = "2c99c7f6a5ee358bbb0dce7c47b8e374";
 
-      if (type === "anime") {
-        // AniList API
-        const query = `
+const searchInput = document.getElementById("searchInput");
+const resultsDropdown = document.getElementById("results");
+const typeSelect = document.getElementById("type");
+
+let searchTimeout;
+
+// 🔎 Search when typing (debounced)
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(search, 400);
+});
+
+async function search() {
+  const query = searchInput.value.trim();
+  const type = typeSelect.value;
+
+  if (!query) {
+    resultsDropdown.style.display = "none";
+    return;
+  }
+
+  resultsDropdown.innerHTML = "";
+
+  if (type === "anime") {
+
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
           query ($search: String) {
-            Media(search: $search, type: ANIME) {
-              startDate { year month day }
+            Page(perPage: 5) {
+              media(search: $search, type: ANIME) {
+                id
+                title { romaji english }
+                startDate { year }
+              }
             }
-          }`;
-        try {
-          const res = await fetch("https://graphql.anilist.co", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query, variables: { search: title } })
-          });
-          const data = await res.json();
-          const d = data.data.Media.startDate;
-          if (!d.year) return alert("Anime not found");
-          releaseDate = new Date(d.year, d.month - 1, d.day).toISOString();
-        } catch(e) { return alert("Error fetching anime data"); }
-      } else {
-        // TMDb API
-        try {
-          const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(title)}`);
-          const data = await res.json();
-          if (!data.results || data.results.length === 0 || !data.results[0].release_date) {
-            return alert("Movie not found on TMDb");
           }
-          releaseDate = new Date(data.results[0].release_date).toISOString();
-        } catch(e) { return alert("Error fetching movie data"); }
-      }
+        `,
+        variables: { search: query }
+      })
+    });
 
-      // Save to localStorage
-      const items = JSON.parse(localStorage.getItem("myPicks") || "[]");
-      items.push({ type, title, releaseDate });
-      localStorage.setItem("myPicks", JSON.stringify(items));
+    const data = await res.json();
+    const results = data.data.Page.media;
 
-      alert("Added successfully!");
-      window.location.href = "index.html"; // Go back to list
-    }
-  </script>
+    results.forEach(anime => {
+      const option = document.createElement("option");
+      option.value = anime.id;
+      option.textContent =
+        `${anime.title.english || anime.title.romaji} (${anime.startDate.year || "?"})`;
+      option.dataset.title =
+        anime.title.english || anime.title.romaji;
+      resultsDropdown.appendChild(option);
+    });
+
+  } else {
+
+    const res = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`
+    );
+
+    const data = await res.json();
+    const results = data.results.slice(0,5);
+
+    results.forEach(movie => {
+      const option = document.createElement("option");
+      option.value = movie.id;
+      option.textContent =
+        `${movie.title} (${movie.release_date?.split("-")[0] || "?"})`;
+      option.dataset.title = movie.title;
+      resultsDropdown.appendChild(option);
+    });
+  }
+
+  resultsDropdown.style.display = "block";
+}
+
+// ➕ Add selected item
+function addSelected() {
+  const selected = resultsDropdown.selectedOptions[0];
+  if (!selected) {
+    alert("Please select something from the list.");
+    return;
+  }
+
+  const type = typeSelect.value;
+  const title = selected.dataset.title;
+
+  const items = JSON.parse(localStorage.getItem("myPicks") || "[]");
+
+  items.push({ type, title });
+  localStorage.setItem("myPicks", JSON.stringify(items));
+
+  alert("Added!");
+  window.location.href = "index.html";
+}
+</script>
+
 </body>
 </html>
