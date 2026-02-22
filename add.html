@@ -1,26 +1,24 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Add Anime or Movie</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Add Anime or Movie</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-body { font-family: Arial; margin: 20px; }
-h1 { text-align: center; }
-select, input, button {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 15px;
-  font-size: 16px;
-  border-radius: 6px;
-}
-button {
-  background: #007bff;
-  color: white;
-  border: none;
-}
-</style>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+    }
+  </style>
 </head>
 
 <body>
@@ -33,121 +31,98 @@ button {
   <option value="movie">Movie</option>
 </select>
 
-<input type="text" id="searchInput" placeholder="Start typing...">
+<input type="text" id="searchInput" placeholder="Type and press Search">
 
-<select id="results" size="5" style="display:none;"></select>
+<button onclick="search()">Search</button>
+
+<select id="results" size="6"></select>
 
 <button onclick="addSelected()">Add Selected</button>
 
 <script>
 const TMDB_KEY = "2c99c7f6a5ee358bbb0dce7c47b8e374";
 
-const searchInput = document.getElementById("searchInput");
-const resultsDropdown = document.getElementById("results");
-const typeSelect = document.getElementById("type");
-
-let searchTimeout;
-
-// 🔎 Search when typing (debounced)
-searchInput.addEventListener("input", () => {
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(search, 400);
-});
-
 async function search() {
-  const query = searchInput.value.trim();
-  const type = typeSelect.value;
-
-  if (!query) {
-    resultsDropdown.style.display = "none";
-    return;
-  }
+  const query = document.getElementById("searchInput").value.trim();
+  const type = document.getElementById("type").value;
+  const resultsDropdown = document.getElementById("results");
 
   resultsDropdown.innerHTML = "";
 
-  try {
+  if (!query) return;
 
-    if (type === "anime") {
+  if (type === "anime") {
 
-      const res = await fetch("https://graphql.anilist.co", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: `
-            query ($search: String) {
-              Page(perPage: 5) {
-                media(search: $search, type: ANIME) {
-                  id
-                  title { romaji english }
-                  startDate { year }
-                }
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: `
+          query ($search: String) {
+            Page(perPage: 5) {
+              media(search: $search, type: ANIME) {
+                id
+                title { romaji english }
+                startDate { year }
               }
             }
-          `,
-          variables: { search: query }
-        })
-      });
+          }
+        `,
+        variables: { search: query }
+      })
+    });
 
-      const data = await res.json();
+    const data = await res.json();
+    const results = data.data.Page.media;
 
-      if (!data.data || !data.data.Page) return;
+    results.forEach(anime => {
+      const option = document.createElement("option");
+      option.value = anime.id;
+      option.textContent =
+        (anime.title.english || anime.title.romaji) +
+        " (" + (anime.startDate.year || "?") + ")";
+      option.dataset.title =
+        anime.title.english || anime.title.romaji;
+      resultsDropdown.appendChild(option);
+    });
 
-      const results = data.data.Page.media;
+  } else {
 
-      results.forEach(anime => {
-        const option = document.createElement("option");
-        option.value = anime.id;
-        option.textContent =
-          `${anime.title.english || anime.title.romaji} (${anime.startDate.year || "?"})`;
-        option.dataset.title =
-          anime.title.english || anime.title.romaji;
-        resultsDropdown.appendChild(option);
-      });
+    const res = await fetch(
+      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`
+    );
 
-    } else {
+    const data = await res.json();
+    const results = data.results.slice(0,5);
 
-      const res = await fetch(
-        `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`
-      );
-
-      const data = await res.json();
-
-      if (!data.results) return;
-
-      data.results.slice(0,5).forEach(movie => {
-        const option = document.createElement("option");
-        option.value = movie.id;
-        option.textContent =
-          `${movie.title} (${movie.release_date?.split("-")[0] || "?"})`;
-        option.dataset.title = movie.title;
-        resultsDropdown.appendChild(option);
-      });
-    }
-
-    resultsDropdown.style.display = resultsDropdown.children.length ? "block" : "none";
-
-  } catch (err) {
-    console.error("Search error:", err);
+    results.forEach(movie => {
+      const option = document.createElement("option");
+      option.value = movie.id;
+      option.textContent =
+        movie.title + " (" +
+        (movie.release_date ? movie.release_date.split("-")[0] : "?") + ")";
+      option.dataset.title = movie.title;
+      resultsDropdown.appendChild(option);
+    });
   }
 }
 
-// ➕ Add selected item
 function addSelected() {
-  const selected = resultsDropdown.selectedOptions[0];
+  const dropdown = document.getElementById("results");
+  const selected = dropdown.options[dropdown.selectedIndex];
+
   if (!selected) {
-    alert("Please select something from the list.");
+    alert("Select something first.");
     return;
   }
 
-  const type = typeSelect.value;
+  const type = document.getElementById("type").value;
   const title = selected.dataset.title;
 
   const items = JSON.parse(localStorage.getItem("myPicks") || "[]");
-
   items.push({ type, title });
   localStorage.setItem("myPicks", JSON.stringify(items));
 
-  alert("Added!");
   window.location.href = "index.html";
 }
 </script>
