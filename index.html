@@ -1,1 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Anime & Movie Countdown</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { text-align: center; }
+    .item { border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 8px; }
+    .timer { font-weight: bold; color: #333; }
+    a { text-decoration: none; color: blue; }
+  </style>
+</head>
+<body>
+  <h1>My Anime & Movie Countdown</h1>
+  <a href="add.html">➕ Add Anime or Movie</a>
+  <div id="list"></div>
 
+  <script>
+    // Get saved items from localStorage
+    let items = JSON.parse(localStorage.getItem("myPicks") || "[]");
+
+    const listDiv = document.getElementById("list");
+
+    function renderList() {
+      listDiv.innerHTML = "";
+      items.forEach((item, index) => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "item";
+
+        itemDiv.innerHTML = `
+          <h2>${item.title} ${item.type === "anime" ? "(Anime)" : "(Movie)"}</h2>
+          <p>Release Date: ${new Date(item.releaseDate).toDateString()}</p>
+          <p class="timer" id="timer-${index}"></p>
+        `;
+        listDiv.appendChild(itemDiv);
+        startCountdown(item.releaseDate, `timer-${index}`);
+      });
+    }
+
+    function startCountdown(dateStr, elementId) {
+      const releaseDate = new Date(dateStr);
+
+      function update() {
+        const now = new Date();
+        const diff = releaseDate - now;
+        const el = document.getElementById(elementId);
+
+        if (diff > 0) {
+          const days = Math.floor(diff / (1000*60*60*24));
+          const hours = Math.floor((diff / (1000*60*60)) % 24);
+          const minutes = Math.floor((diff / (1000*60)) % 60);
+          const seconds = Math.floor((diff / 1000) % 60);
+          el.innerText = `${days}d ${hours}h ${minutes}m ${seconds}s until release`;
+        } else {
+          el.innerText = "Already released!";
+        }
+      }
+
+      update();
+      setInterval(update, 1000);
+    }
+
+    renderList();
+  </script>
+</body>
+</html>
