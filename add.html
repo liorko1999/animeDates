@@ -24,21 +24,11 @@
   <label>Title</label>
   <input type="text" id="title" placeholder="Enter anime/movie name">
 
-  <div id="movieDateInput" style="display:none;">
-    <label>Release Date (fallback for movies)</label>
-    <input type="date" id="releaseDate">
-  </div>
-
   <button onclick="addItem()">Add</button>
 
   <script>
     const typeSelect = document.getElementById("type");
-    const movieDateInput = document.getElementById("movieDateInput");
     const TMDB_KEY = "2c99c7f6a5ee358bbb0dce7c47b8e374";
-
-    typeSelect.addEventListener("change", () => {
-      movieDateInput.style.display = typeSelect.value === "movie" ? "block" : "none";
-    });
 
     async function addItem() {
       const type = typeSelect.value;
@@ -48,45 +38,49 @@
       let releaseDate;
 
       if (type === "anime") {
-        // AniList API
+        // Fetch from AniList API
         const query = `
-        query ($search: String) {
-          Media(search: $search, type: ANIME) {
-            startDate { year month day }
-          }
-        }`;
+          query ($search: String) {
+            Media(search: $search, type: ANIME) {
+              startDate { year month day }
+            }
+          }`;
 
-        const res = await fetch("https://graphql.anilist.co", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, variables: { search: title } })
-        });
-
-        const data = await res.json();
-        const d = data.data.Media.startDate;
-        if (!d.year) return alert("Anime not found");
-        releaseDate = new Date(d.year, d.month - 1, d.day).toISOString();
+        try {
+          const res = await fetch("https://graphql.anilist.co", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query, variables: { search: title } })
+          });
+          const data = await res.json();
+          const d = data.data.Media.startDate;
+          if (!d.year) return alert("Anime not found");
+          releaseDate = new Date(d.year, d.month - 1, d.day).toISOString();
+        } catch (err) {
+          return alert("Error fetching anime data");
+        }
 
       } else {
-        // TMDb API
-        const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(title)}`);
-        const data = await res.json();
-        if (!data.results || data.results.length === 0) {
-          // fallback to manual input
-          const dateInput = document.getElementById("releaseDate").value;
-          if (!dateInput) return alert("Movie not found and no date entered");
-          releaseDate = new Date(dateInput).toISOString();
-        } else {
+        // Fetch from TMDb API
+        try {
+          const res = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(title)}`);
+          const data = await res.json();
+          if (!data.results || data.results.length === 0 || !data.results[0].release_date) {
+            return alert("Movie not found on TMDb");
+          }
           releaseDate = new Date(data.results[0].release_date).toISOString();
+        } catch (err) {
+          return alert("Error fetching movie data");
         }
       }
 
+      // Save to localStorage
       const items = JSON.parse(localStorage.getItem("myPicks") || "[]");
       items.push({ type, title, releaseDate });
       localStorage.setItem("myPicks", JSON.stringify(items));
 
       alert("Added successfully!");
-      window.location.href = "index.html";
+      window.location.href = "index.html"; // Go back to list
     }
   </script>
 </body>
