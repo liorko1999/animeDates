@@ -65,60 +65,70 @@ async function search() {
 
   resultsDropdown.innerHTML = "";
 
-  if (type === "anime") {
+  try {
 
-    const res = await fetch("https://graphql.anilist.co", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: `
-          query ($search: String) {
-            Page(perPage: 5) {
-              media(search: $search, type: ANIME) {
-                id
-                title { romaji english }
-                startDate { year }
+    if (type === "anime") {
+
+      const res = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `
+            query ($search: String) {
+              Page(perPage: 5) {
+                media(search: $search, type: ANIME) {
+                  id
+                  title { romaji english }
+                  startDate { year }
+                }
               }
             }
-          }
-        `,
-        variables: { search: query }
-      })
-    });
+          `,
+          variables: { search: query }
+        })
+      });
 
-    const data = await res.json();
-    const results = data.data.Page.media;
+      const data = await res.json();
 
-    results.forEach(anime => {
-      const option = document.createElement("option");
-      option.value = anime.id;
-      option.textContent =
-        `${anime.title.english || anime.title.romaji} (${anime.startDate.year || "?"})`;
-      option.dataset.title =
-        anime.title.english || anime.title.romaji;
-      resultsDropdown.appendChild(option);
-    });
+      if (!data.data || !data.data.Page) return;
 
-  } else {
+      const results = data.data.Page.media;
 
-    const res = await fetch(
-      `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`
-    );
+      results.forEach(anime => {
+        const option = document.createElement("option");
+        option.value = anime.id;
+        option.textContent =
+          `${anime.title.english || anime.title.romaji} (${anime.startDate.year || "?"})`;
+        option.dataset.title =
+          anime.title.english || anime.title.romaji;
+        resultsDropdown.appendChild(option);
+      });
 
-    const data = await res.json();
-    const results = data.results.slice(0,5);
+    } else {
 
-    results.forEach(movie => {
-      const option = document.createElement("option");
-      option.value = movie.id;
-      option.textContent =
-        `${movie.title} (${movie.release_date?.split("-")[0] || "?"})`;
-      option.dataset.title = movie.title;
-      resultsDropdown.appendChild(option);
-    });
+      const res = await fetch(
+        `https://api.themoviedb.org/3/search/movie?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}`
+      );
+
+      const data = await res.json();
+
+      if (!data.results) return;
+
+      data.results.slice(0,5).forEach(movie => {
+        const option = document.createElement("option");
+        option.value = movie.id;
+        option.textContent =
+          `${movie.title} (${movie.release_date?.split("-")[0] || "?"})`;
+        option.dataset.title = movie.title;
+        resultsDropdown.appendChild(option);
+      });
+    }
+
+    resultsDropdown.style.display = resultsDropdown.children.length ? "block" : "none";
+
+  } catch (err) {
+    console.error("Search error:", err);
   }
-
-  resultsDropdown.style.display = "block";
 }
 
 // ➕ Add selected item
